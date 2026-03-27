@@ -1,0 +1,630 @@
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TeleportService = game:GetService("TeleportService")
+
+local player = Players.LocalPlayer
+
+-- =========================
+-- CHARACTER
+-- =========================
+local function getHRP()
+    local char = player.Character or player.CharacterAdded:Wait()
+    return char:WaitForChild("HumanoidRootPart")
+end
+
+local hrp = getHRP()
+
+player.CharacterAdded:Connect(function()
+    hrp = getHRP()
+end)
+
+-- =========================
+-- TP
+-- =========================
+local function TP(cf)
+    if hrp then
+        hrp.CFrame = cf
+    end
+end
+
+-- =========================
+-- SETTINGS
+-- =========================
+local AutoBall = false
+local Busy = false
+
+local SellPos = CFrame.new(-75, 20, -102)
+
+-- 🔥 เลือกเป้า
+local SelectedValues = {
+    ["50"] = false,
+    ["100"] = false,
+    ["500"] = false,
+    ["1000"] = false,
+    ["1"] = false,
+    ["5"] = false
+}
+
+-- =========================
+-- หาเป้า
+-- =========================
+local function GetTarget()
+    local closestPrompt, closestPart
+    local dist = math.huge
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("ProximityPrompt") and v.ActionText then
+            
+            for val, enabled in pairs(SelectedValues) do
+                if enabled and string.find(v.ActionText, val) then
+                    
+                    local part = v.Parent
+                    if part and not part:IsA("BasePart") then
+                        part = part:FindFirstChildWhichIsA("BasePart")
+                    end
+
+                    if part then
+                        local d = (hrp.Position - part.Position).Magnitude
+                        if d < dist then
+                            dist = d
+                            closestPrompt = v
+                            closestPart = part
+                        end
+                    end
+                end
+            end
+
+        end
+    end
+
+    return closestPart, closestPrompt
+end
+
+-- =========================
+-- LOOP
+-- =========================
+task.spawn(function()
+    while task.wait(0.2) do
+        if AutoBall and not Busy and hrp then
+
+            local part, prompt = GetTarget()
+
+            if part and prompt then
+                Busy = true
+
+                TP(part.CFrame + Vector3.new(0,3,0))
+                task.wait(0.2)
+
+                local start = tick()
+                while part and part.Parent do
+                    fireproximityprompt(prompt)
+                    task.wait(0.15)
+
+                    if tick() - start > 5 then
+                        break
+                    end
+                end
+
+                task.wait(0.2)
+
+                TP(SellPos)
+                task.wait(0.3)
+
+                for _, v in pairs(workspace:GetDescendants()) do
+                    if v:IsA("ProximityPrompt") and v.ActionText and v.ActionText:lower():find("drop") then
+                        
+                        local p = v.Parent
+                        if p and not p:IsA("BasePart") then
+                            p = p:FindFirstChildWhichIsA("BasePart")
+                        end
+
+                        if p and (p.Position - SellPos.Position).Magnitude < 15 then
+                            
+                            local t = tick()
+                            while tick() - t < 2 do
+                                fireproximityprompt(v)
+                                task.wait(0.2)
+                            end
+
+                        end
+                    end
+                end
+
+                task.wait(0.5)
+                Busy = false
+            end
+        end
+    end
+end)
+
+-- =========================
+-- UI
+-- =========================
+local Window = WindUI:CreateWindow({
+    Title = "ThanaKrit1669",
+    Icon = "key",
+    Author = "By เสี๋ยคิวจัดให้ XD",
+    Folder = "MyHub",
+    Size = UDim2.fromOffset(580, 400),
+    Theme = "Dark"
+})
+
+-- TAB FARM
+local FarmTab = Window:Tab({
+    Title = "Auto Farm",
+    Icon = "zap"
+})
+
+FarmTab:Section({ Title = "Auto Farm Settings" })
+
+-- ปุ่มเปิด/ปิด
+FarmTab:Toggle({
+    Title = "เปิด Auto Farm",
+    Default = false,
+    Callback = function(v)
+        AutoBall = v
+    end
+})
+
+-- =========================
+-- เลือกค่า (แยกช่อง)
+-- =========================
+FarmTab:Section({ Title = "เลือกเป้าที่จะฟาร์ม" })
+
+local function createToggle(name)
+    FarmTab:Toggle({
+        Title = name,
+        Default = SelectedValues[name],
+        Callback = function(v)
+            SelectedValues[name] = v
+        end
+    })
+end
+
+createToggle("50")
+createToggle("100")
+createToggle("500")
+createToggle("1000")
+createToggle("1")
+createToggle("5")
+
+-- =========================
+-- PLAYER TP SYSTEM
+-- =========================
+local SelectedPlayer = nil
+local FollowPlayer = false
+
+-- หา HRP ของเป้าหมาย
+local function GetTargetHRP(plr)
+    if plr and plr.Character then
+        return plr.Character:FindFirstChild("HumanoidRootPart")
+    end
+end
+
+-- =========================
+-- TAB PLAYER
+-- =========================
+local PlayerTab = Window:Tab({
+    Title = "Player TP",
+    Icon = "user"
+})
+
+PlayerTab:Section({ Title = "เลือกผู้เล่น" })
+
+-- dropdown รายชื่อผู้เล่น
+local function GetPlayerList()
+    local list = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            table.insert(list, p.Name)
+        end
+    end
+    return list
+end
+
+local PlayerDropdown = PlayerTab:Dropdown({
+    Title = "เลือกคน",
+    Values = GetPlayerList(),
+    Callback = function(v)
+        SelectedPlayer = Players:FindFirstChild(v)
+    end
+})
+
+-- รีเฟรชรายชื่อ
+PlayerTab:Button({
+    Title = "รีเฟรชรายชื่อ",
+    Callback = function()
+        PlayerDropdown:Refresh(GetPlayerList())
+    end
+})
+
+-- =========================
+-- โหมดวาป
+-- =========================
+PlayerTab:Section({ Title = "โหมดวาป" })
+
+-- วาปครั้งเดียว
+PlayerTab:Button({
+    Title = "วาปไปหา",
+    Callback = function()
+        if SelectedPlayer then
+            local targetHRP = GetTargetHRP(SelectedPlayer)
+            if targetHRP then
+                TP(targetHRP.CFrame + Vector3.new(0,3,0))
+            end
+        end
+    end
+})
+
+-- ตัวติด
+PlayerTab:Toggle({
+    Title = "ตัวติด (Follow)",
+    Default = false,
+    Callback = function(v)
+        FollowPlayer = v
+    end
+})
+
+-- =========================
+-- LOOP FOLLOW
+-- =========================
+RunService.RenderStepped:Connect(function()
+    if FollowPlayer and SelectedPlayer and hrp then
+        local targetHRP = GetTargetHRP(SelectedPlayer)
+        if targetHRP then
+            hrp.CFrame = targetHRP.CFrame * CFrame.new(0,0,3) -- ตามหลัง
+        end
+    end
+end)
+
+-- =========================
+-- ESP PRO (ADVANCED)
+-- =========================
+
+local ESPEnabled = false
+local ESP_Box = true
+local ESP_Name = true
+local ESP_Distance = true
+local ESP_Line = true
+
+local ESPObjects = {}
+
+local function getRGB()
+    local t = tick()
+    return Color3.fromRGB(
+        math.sin(t)*127+128,
+        math.sin(t+2)*127+128,
+        math.sin(t+4)*127+128
+    )
+end
+
+local function CreateESP(plr)
+    if plr == player then return end
+    if ESPObjects[plr] then return end
+
+    local esp = {}
+
+    -- กรอบ
+    local highlight = Instance.new("Highlight")
+    highlight.FillTransparency = 1
+    highlight.Parent = game.CoreGui
+
+    -- ชื่อ
+    local billboard = Instance.new("BillboardGui")
+    billboard.Size = UDim2.new(0,200,0,50)
+    billboard.AlwaysOnTop = true
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextStrokeTransparency = 0
+    text.TextScaled = true
+    text.Parent = billboard
+
+    billboard.Parent = game.CoreGui
+
+    -- เส้น
+    local line = Drawing.new("Line")
+    line.Thickness = 1
+
+    esp.Highlight = highlight
+    esp.Billboard = billboard
+    esp.Text = text
+    esp.Line = line
+
+    ESPObjects[plr] = esp
+end
+
+local function RemoveESP(plr)
+    if ESPObjects[plr] then
+        local esp = ESPObjects[plr]
+
+        if esp.Highlight then esp.Highlight:Destroy() end
+        if esp.Billboard then esp.Billboard:Destroy() end
+        if esp.Line then esp.Line:Remove() end
+
+        ESPObjects[plr] = nil
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if not ESPEnabled then return end
+
+    local color = getRGB()
+
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player then
+
+            if not ESPObjects[plr] then
+                CreateESP(plr)
+            end
+
+            local esp = ESPObjects[plr]
+            local char = plr.Character
+            local hrp2 = char and char:FindFirstChild("HumanoidRootPart")
+
+            if char and hrp2 then
+                local dist = (hrp.Position - hrp2.Position).Magnitude
+
+                -- BOX
+                if ESP_Box then
+                    esp.Highlight.Adornee = char
+                    esp.Highlight.OutlineColor = color
+                    esp.Highlight.Enabled = true
+                else
+                    esp.Highlight.Enabled = false
+                end
+
+                -- NAME + DIST
+                if ESP_Name or ESP_Distance then
+                    esp.Billboard.Adornee = hrp2
+                    esp.Text.TextColor3 = color
+
+                    local txt = ""
+                    if ESP_Name then
+                        txt = plr.Name
+                    end
+                    if ESP_Distance then
+                        txt = txt .. " ["..math.floor(dist).."]"
+                    end
+
+                    esp.Text.Text = txt
+                    esp.Billboard.Enabled = true
+                else
+                    esp.Billboard.Enabled = false
+                end
+
+                -- LINE
+                if ESP_Line then
+                    local pos, vis = workspace.CurrentCamera:WorldToViewportPoint(hrp2.Position)
+
+                    if vis then
+                        esp.Line.From = Vector2.new(workspace.CurrentCamera.ViewportSize.X/2, workspace.CurrentCamera.ViewportSize.Y)
+                        esp.Line.To = Vector2.new(pos.X,pos.Y)
+                        esp.Line.Color = color
+                        esp.Line.Visible = true
+                    else
+                        esp.Line.Visible = false
+                    end
+                else
+                    esp.Line.Visible = false
+                end
+            end
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+-- =========================
+-- TAB ESP
+-- =========================
+local ESPTab = Window:Tab({
+    Title = "ESP PRO",
+    Icon = "eye"
+})
+
+ESPTab:Section({ Title = "ESP SETTINGS" })
+
+ESPTab:Toggle({
+    Title = "เปิด ESP",
+    Callback = function(v)
+        ESPEnabled = v
+
+        if not v then
+            for plr,_ in pairs(ESPObjects) do
+                RemoveESP(plr)
+            end
+        end
+    end
+})
+
+ESPTab:Toggle({
+    Title = "ESP กรอบ RGB",
+    Default = true,
+    Callback = function(v)
+        ESP_Box = v
+    end
+})
+
+ESPTab:Toggle({
+    Title = "ESP ชื่อ",
+    Default = true,
+    Callback = function(v)
+        ESP_Name = v
+    end
+})
+
+ESPTab:Toggle({
+    Title = "ESP ระยะ",
+    Default = true,
+    Callback = function(v)
+        ESP_Distance = v
+    end
+})
+
+ESPTab:Toggle({
+    Title = "ESP เส้น RGB",
+    Default = true,
+    Callback = function(v)
+        ESP_Line = v
+    end
+})
+
+
+-- =========================
+-- SPEED SYSTEM (TP WALK)
+-- =========================
+local TPWalkEnabled = false
+local TPWalkSpeed = 1
+
+RunService.RenderStepped:Connect(function()
+    if TPWalkEnabled and hrp then
+        local moveDir = player.Character.Humanoid.MoveDirection
+        if moveDir.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + (moveDir * TPWalkSpeed)
+        end
+    end
+end)
+-- =========================
+-- SPEED TAB
+-- =========================
+local SpeedTab = Window:Tab({
+    Title = "Speed",
+    Icon = "zap"
+})
+
+SpeedTab:Section({ Title = "TP Walk Settings" })
+
+-- เปิด/ปิด
+SpeedTab:Toggle({
+    Title = "เปิด TPWalk (ลื่น)",
+    Default = false,
+    Callback = function(v)
+        TPWalkEnabled = v
+    end
+})
+
+-- สไลด์ความเร็ว
+SpeedTab:Slider({
+    Title = "ความเร็ว TPWalk",
+    Step = 1,
+    Value = {
+        Min = 1,
+        Max = 20,
+        Default = 1
+    },
+    Callback = function(v)
+        TPWalkSpeed = v
+    end
+})
+
+-- ช่องพิมพ์ความเร็ว
+SpeedTab:Input({
+    Title = "พิมพ์ความเร็ว",
+    Placeholder = "เช่น 5",
+    Callback = function(v)
+        local num = tonumber(v)
+        if num then
+            TPWalkSpeed = num
+        end
+    end
+})
+
+
+-- =========================
+-- TELEPORT POINTS
+-- =========================
+local TeleportPoints = {
+    ["Farm"] = {
+        ["จุดขาย"] = CFrame.new(-75, 20, -102),
+        ["จุดโดด"] = CFrame.new(-58, 266, -2),
+        ["จุดสปาว 2"] = CFrame.new(-58, 16, -121)
+    },
+
+    ["Shop"] = {
+        ["ร้านค้า"] = CFrame.new(-91, 16, -110),
+        ["---"] = CFrame.new(0, 10, 0)
+    },
+
+    ["Other"] = {
+        ["นอกโลก"] = CFrame.new(0, 10, 0)
+    }
+}
+-- =========================
+-- TELEPORT TAB
+-- =========================
+local TPTab = Window:Tab({
+    Title = "Teleport",
+    Icon = "map-pin"
+})
+for category, locations in pairs(TeleportPoints) do
+    
+    TPTab:Section({ Title = category })
+
+    for name, cf in pairs(locations) do
+        TPTab:Button({
+            Title = "วาปไป: " .. name,
+            Callback = function()
+                TP(cf)
+            end
+        })
+    end
+
+end
+-- =========================
+--        SETTINGS TAB (เหมือนเดิม)
+-- =========================
+local SettingsTab = Window:Tab({
+    Title = "Discrod & instagram",
+    Icon = "settings"
+})
+
+SettingsTab:Button({
+    Title = "รีเข้าแมพ",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId)
+    end
+})
+
+SettingsTab:Button({
+    Title = "ปิด UI",
+    Callback = function()
+        local gui = LocalPlayer.PlayerGui:FindFirstChild("MyHub")
+        if gui then gui:Destroy() end
+    end
+})
+
+SettingsTab:Section({ Title = "Contact" })
+
+SettingsTab:Button({
+    Title = "คัดลอก IG 📸",
+    Callback = function()
+        if setclipboard then
+            setclipboard("https://www.instagram.com/ezmxyxii/") -- ใส่ IG ของคุณตรงนี้
+        end
+
+        WindUI:Notify({
+            Title = "สำเร็จ",
+            Description = "คัดลอก IG แล้ว ✅",
+            Duration = 2
+        })
+    end
+})
+
+SettingsTab:Button({
+    Title = "คัดลอก Discord 💬",
+    Callback = function()
+        if setclipboard then
+            setclipboard("https://discord.gg/XKJTssDUSR") -- ใส่ Discord ของคุณ
+        end
+
+        WindUI:Notify({
+            Title = "สำเร็จ",
+            Description = "คัดลอก Discord แล้ว ✅",
+            Duration = 2
+        })
+    end
+})
